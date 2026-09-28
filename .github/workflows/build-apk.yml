@@ -3,7 +3,7 @@ name: Build GS CINEMATIC APK
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
@@ -18,33 +18,38 @@ jobs:
           mkdir android-project
           unzip -q *.zip -d android-project
 
-      - name: Find project
-        run: |
-          find android-project -name settings.gradle -o -name settings.gradle.kts
-
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: "8.7"
 
       - name: Build APK
         working-directory: android-project
         run: |
           PROJECT_DIR=$(find . -name settings.gradle -o -name settings.gradle.kts | head -1 | xargs dirname)
           cd "$PROJECT_DIR"
-          gradle assembleDebug --stacktrace
+          set +e
+          gradle assembleDebug --stacktrace --console=plain > build.log 2>&1
+          STATUS=$?
+          echo "================ ROOT ERROR ================"
+          grep -n -A15 -B5 -E "What went wrong|FAILURE:|Caused by:|Could not" build.log || true
+          echo "================ LAST LOG ================"
+          tail -n 100 build.log
+          exit $STATUS
 
       - name: Find APK
+        if: always()
         run: |
-          find android-project -name "*.apk"
+          find android-project -name "*.apk" -print
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: GS-CINEMATIC-APK
